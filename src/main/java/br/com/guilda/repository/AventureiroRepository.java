@@ -1,56 +1,26 @@
 package br.com.guilda.repository;
 
 import br.com.guilda.model.Aventureiro;
+import br.com.guilda.model.ClasseAventureiro;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
+public interface AventureiroRepository extends JpaRepository<Aventureiro, Long> {
 
-import org.springframework.stereotype.Repository;
+    Page<Aventureiro> findByAtivo(Boolean ativo, Pageable pageable);
 
-@Repository
-public class AventureiroRepository {
-    private final List<Aventureiro> banco = new ArrayList<>();
-    private final AtomicLong sequence = new AtomicLong(1);
+    Page<Aventureiro> findByClasse(ClasseAventureiro classe, Pageable pageable);
 
-    public List<Aventureiro> findAll() {
-        return banco;
-    }
+    Page<Aventureiro> findByNivelGreaterThanEqual(Integer nivel, Pageable pageable);
 
-    public Optional<Aventureiro> findById(Long id) {
-        return banco.stream()
-                .filter(a -> a.getId().equals(id))
-                .findFirst();
-    }
+    Page<Aventureiro> findByAtivoAndClasse(Boolean ativo, ClasseAventureiro classe, Pageable pageable);
 
-    public Aventureiro save(Aventureiro aventureiro) {
-        if (aventureiro.getId() == null) {
-            aventureiro.setId(sequence.getAndIncrement());
-            banco.add(aventureiro);
-        } else {
-            deleteById(aventureiro.getId());
-            banco.add(aventureiro);
-        }
+    Page<Aventureiro> findByAtivoAndNivelGreaterThanEqual(Boolean ativo, Integer nivel, Pageable pageable);
 
-        banco.sort(Comparator.comparing(Aventureiro::getId));
-        return aventureiro;
-    }
+    Page<Aventureiro> findByClasseAndNivelGreaterThanEqual(ClasseAventureiro classe, Integer nivel, Pageable pageable);
 
-    public void deleteById(Long id) {
-        banco.removeIf(a -> a.getId().equals(id));
-    }
+    Page<Aventureiro> findByAtivoAndClasseAndNivelGreaterThanEqual(Boolean ativo, ClasseAventureiro classe, Integer nivel, Pageable pageable);
 
-    public Long nextId() {
-        return sequence.getAndIncrement();
-    }
-
-    public void seed(List<Aventureiro> aventureiros) {
-        banco.clear();
-        banco.addAll(aventureiros);
-        banco.sort(Comparator.comparing(Aventureiro::getId));
-        long maxId = banco.stream().mapToLong(Aventureiro::getId).max().orElse(0L);
-        sequence.set(maxId + 1);
-    }
+    Page<Aventureiro> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
 }

@@ -33,14 +33,24 @@ public class AventureiroController {
 
     @GetMapping
     public ResponseEntity<List<AventureiroResumoResponse>> listar(
+            @RequestParam(required = false) String nome,
             @RequestParam(required = false) String classe,
             @RequestParam(required = false) Boolean ativo,
             @RequestParam(required = false) Integer nivelMinimo,
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size
     ) {
-        List<AventureiroResumoResponse> lista = service.listar(classe, ativo, nivelMinimo, page, size);
-        int total = service.contarFiltrados(classe, ativo, nivelMinimo);
+        List<AventureiroResumoResponse> lista;
+        int total;
+
+        if (nome != null && !nome.isBlank()) {
+            lista = service.buscarPorNome(nome, page, size);
+            total = service.contarPorNome(nome);
+        } else {
+            lista = service.listar(classe, ativo, nivelMinimo, page, size);
+            total = service.contarFiltrados(classe, ativo, nivelMinimo);
+        }
+
         int totalPages = (int) Math.ceil((double) total / size);
 
         return ResponseEntity.ok()

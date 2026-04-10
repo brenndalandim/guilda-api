@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+// Não é mais utilizado a partir do TP2, mas mantive para histórico
 @Component
 public class CreateData implements CommandLineRunner {
     private final AventureiroRepository repository;
@@ -45,6 +46,6 @@ public class CreateData implements CommandLineRunner {
             lista.add(a);
         }
 
-        repository.seed(lista);
+        //repository.seed(lista);
     }
 }

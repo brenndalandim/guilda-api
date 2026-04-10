@@ -13,6 +13,14 @@ import br.com.guilda.model.ClasseAventureiro;
 import br.com.guilda.model.Companheiro;
 import br.com.guilda.model.EspecieCompanheiro;
 import br.com.guilda.repository.AventureiroRepository;
+import br.com.guilda.model.Usuario;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import br.com.guilda.dto.UltimaMissaoResponse;
+import br.com.guilda.model.ParticipacaoMissao;
+import br.com.guilda.repository.ParticipacaoMissaoRepository;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,21 +28,33 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
+import br.com.guilda.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AventureiroService {
 
     private final AventureiroRepository repository;
+    private final UsuarioRepository usuarioRepository;
+    private final ParticipacaoMissaoRepository participacaoMissaoRepository;
 
-    public AventureiroService(AventureiroRepository repository) {
+    public AventureiroService(AventureiroRepository repository,
+                              UsuarioRepository usuarioRepository,
+                              ParticipacaoMissaoRepository participacaoMissaoRepository) {
         this.repository = repository;
+        this.usuarioRepository = usuarioRepository;
+        this.participacaoMissaoRepository = participacaoMissaoRepository;
     }
 
     public AventureiroDetalheResponse criar(AventureiroCreateRequest request) {
         validarAventureiro(request.getNome(), request.getClasse(), request.getNivel());
 
+        Usuario usuarioCadastro = usuarioRepository.findFirstByOrderByIdAsc()
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário de cadastro não encontrado"));
+
         Aventureiro aventureiro = new Aventureiro();
+        aventureiro.setOrganizacao(usuarioCadastro.getOrganizacao());
+        aventureiro.setUsuarioCadastro(usuarioCadastro);
         aventureiro.setNome(request.getNome().trim());
         aventureiro.setClasse(ClasseAventureiro.valueOf(request.getClasse()));
         aventureiro.setNivel(request.getNivel());
@@ -54,62 +74,97 @@ public class AventureiroService {
     public List<AventureiroResumoResponse> listar(String classe, Boolean ativo, Integer nivelMinimo, Integer page, Integer size) {
         validarPaginacao(page, size);
 
-        Stream<Aventureiro> stream = repository.findAll().stream();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nome").ascending());
 
+        ClasseAventureiro classeEnum = null;
         if (classe != null && !classe.isBlank()) {
             List<String> erros = new ArrayList<>();
-            ClasseAventureiro classeEnum = parseClasse(classe, erros);
+            classeEnum = parseClasse(classe, erros);
             if (!erros.isEmpty()) {
                 throw new InvalidRequestException("Solicitação inválida", erros);
             }
-            stream = stream.filter(a -> a.getClasse() == classeEnum);
         }
 
-        if (ativo != null) {
-            stream = stream.filter(a -> a.getAtivo().equals(ativo));
+        Page<Aventureiro> resultado;
+
+        if (ativo != null && classeEnum != null && nivelMinimo != null) {
+            resultado = repository.findByAtivoAndClasseAndNivelGreaterThanEqual(ativo, classeEnum, nivelMinimo, pageable);
+        } else if (ativo != null && classeEnum != null) {
+            resultado = repository.findByAtivoAndClasse(ativo, classeEnum, pageable);
+        } else if (ativo != null && nivelMinimo != null) {
+            resultado = repository.findByAtivoAndNivelGreaterThanEqual(ativo, nivelMinimo, pageable);
+        } else if (classeEnum != null && nivelMinimo != null) {
+            resultado = repository.findByClasseAndNivelGreaterThanEqual(classeEnum, nivelMinimo, pageable);
+        } else if (ativo != null) {
+            resultado = repository.findByAtivo(ativo, pageable);
+        } else if (classeEnum != null) {
+            resultado = repository.findByClasse(classeEnum, pageable);
+        } else if (nivelMinimo != null) {
+            resultado = repository.findByNivelGreaterThanEqual(nivelMinimo, pageable);
+        } else {
+            resultado = repository.findAll(pageable);
         }
 
-        if (nivelMinimo != null) {
-            stream = stream.filter(a -> a.getNivel() >= nivelMinimo);
-        }
-
-        List<Aventureiro> filtrados = stream
-                .sorted(Comparator.comparing(Aventureiro::getId))
-                .toList();
-
-        int fromIndex = page * size;
-        if (fromIndex >= filtrados.size()) {
-            return Collections.emptyList();
-        }
-
-        int toIndex = Math.min(fromIndex + size, filtrados.size());
-
-        return filtrados.subList(fromIndex, toIndex).stream()
+        return resultado.getContent().stream()
                 .map(this::toResumoResponse)
                 .toList();
     }
 
+    public List<AventureiroResumoResponse> buscarPorNome(String nome, Integer page, Integer size) {
+        validarPaginacao(page, size);
+
+        if (nome == null || nome.isBlank()) {
+            throw new InvalidRequestException("Solicitação inválida", List.of("nome é obrigatório para busca"));
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nome").ascending());
+
+        return repository.findByNomeContainingIgnoreCase(nome.trim(), pageable)
+                .getContent()
+                .stream()
+                .map(this::toResumoResponse)
+                .toList();
+    }
+
+    public int contarPorNome(String nome) {
+        if (nome == null || nome.isBlank()) {
+            throw new InvalidRequestException("Solicitação inválida", List.of("nome é obrigatório para busca"));
+        }
+
+        Pageable pageable = PageRequest.of(0, 1);
+        return (int) repository.findByNomeContainingIgnoreCase(nome.trim(), pageable).getTotalElements();
+    }
+
     public int contarFiltrados(String classe, Boolean ativo, Integer nivelMinimo) {
-        Stream<Aventureiro> stream = repository.findAll().stream();
+        ClasseAventureiro classeEnum = null;
 
         if (classe != null && !classe.isBlank()) {
             List<String> erros = new ArrayList<>();
-            ClasseAventureiro classeEnum = parseClasse(classe, erros);
+            classeEnum = parseClasse(classe, erros);
             if (!erros.isEmpty()) {
                 throw new InvalidRequestException("Solicitação inválida", erros);
             }
-            stream = stream.filter(a -> a.getClasse() == classeEnum);
         }
 
-        if (ativo != null) {
-            stream = stream.filter(a -> a.getAtivo().equals(ativo));
+        Pageable pageable = PageRequest.of(0, 1);
+
+        if (ativo != null && classeEnum != null && nivelMinimo != null) {
+            return (int) repository.findByAtivoAndClasseAndNivelGreaterThanEqual(ativo, classeEnum, nivelMinimo, pageable).getTotalElements();
+        } else if (ativo != null && classeEnum != null) {
+            return (int) repository.findByAtivoAndClasse(ativo, classeEnum, pageable).getTotalElements();
+        } else if (ativo != null && nivelMinimo != null) {
+            return (int) repository.findByAtivoAndNivelGreaterThanEqual(ativo, nivelMinimo, pageable).getTotalElements();
+        } else if (classeEnum != null && nivelMinimo != null) {
+            return (int) repository.findByClasseAndNivelGreaterThanEqual(classeEnum, nivelMinimo, pageable).getTotalElements();
+        } else if (ativo != null) {
+            return (int) repository.findByAtivo(ativo, pageable).getTotalElements();
+        } else if (classeEnum != null) {
+            return (int) repository.findByClasse(classeEnum, pageable).getTotalElements();
+        } else if (nivelMinimo != null) {
+            return (int) repository.findByNivelGreaterThanEqual(nivelMinimo, pageable).getTotalElements();
         }
 
-        if (nivelMinimo != null) {
-            stream = stream.filter(a -> a.getNivel() >= nivelMinimo);
-        }
-
-        return (int) stream.count();
+        return (int) repository.count();
     }
 
     public AventureiroDetalheResponse atualizar(Long id, AventureiroUpdateRequest request) {
@@ -189,13 +244,30 @@ public class AventureiroService {
             );
         }
 
+        int totalParticipacoes = (int) participacaoMissaoRepository.countByAventureiroId(a.getId());
+
+        UltimaMissaoResponse ultimaMissaoResponse = null;
+        List<ParticipacaoMissao> participacoes = participacaoMissaoRepository.buscarUltimasParticipacoesComMissao(a.getId());
+
+        if (!participacoes.isEmpty()) {
+            var missao = participacoes.get(0).getMissao();
+            ultimaMissaoResponse = new UltimaMissaoResponse(
+                    missao.getId(),
+                    missao.getTitulo(),
+                    missao.getStatus().name(),
+                    missao.getNivelPerigo().name()
+            );
+        }
+
         return new AventureiroDetalheResponse(
                 a.getId(),
                 a.getNome(),
                 a.getClasse().name(),
                 a.getNivel(),
                 a.getAtivo(),
-                companheiroResponse
+                companheiroResponse,
+                totalParticipacoes,
+                ultimaMissaoResponse
         );
     }
 
