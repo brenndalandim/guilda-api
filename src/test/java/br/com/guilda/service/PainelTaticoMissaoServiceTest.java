@@ -8,7 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,12 +30,12 @@ class PainelTaticoMissaoServiceTest {
         PainelTaticoMissao missao1 = new PainelTaticoMissao();
         PainelTaticoMissao missao2 = new PainelTaticoMissao();
 
-        when(repository.findTop10ByUltimaAtualizacaoGreaterThanEqualOrderByIndiceProntidaoDesc(any(OffsetDateTime.class)))
+        when(repository.findTop10ByUltimaAtualizacaoGreaterThanEqualOrderByIndiceProntidaoDesc(any(LocalDateTime.class)))
                 .thenReturn(List.of(missao1, missao2));
 
         List<PainelTaticoMissao> resultado = service.buscarTopMissoesUltimos15Dias();
 
         assertThat(resultado).hasSize(2);
-        verify(repository).findTop10ByUltimaAtualizacaoGreaterThanEqualOrderByIndiceProntidaoDesc(any(OffsetDateTime.class));
+        verify(repository).findTop10ByUltimaAtualizacaoGreaterThanEqualOrderByIndiceProntidaoDesc(any(LocalDateTime.class));
     }
 }
