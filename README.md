@@ -6,6 +6,31 @@ A aplicação permite registrar, consultar, atualizar e gerenciar aventureiros e
 
 ---
 
+## Como executar o projeto
+
+Pré-requisitos:
+
+- Java 17 ou superior
+- Maven
+
+Na pasta do projeto execute:  
+mvn clean install  
+mvn spring-boot:run
+
+A aplicação iniciará em:
+http://localhost:8080
+
+### IMPORTANTE
+No banco de dados pode ser necessário forçar a senha correta para funcionamento. No terminal utilize:
+
+docker exec -it postgres-tp2 psql -U postgres
+
+ALTER USER postgres WITH PASSWORD 'postgres';
+
+Isso força para a senha correta necessária ao acesso da API
+
+---
+
 ## Tecnologias utilizadas
 
 - Java 17+
@@ -27,22 +52,6 @@ model → entidades do domínio
 dto → objetos de requisição e resposta  
 exception → tratamento de erros da API  
 util → inicialização de dados
-
----
-
-## Como executar o projeto
-
-Pré-requisitos:
-
-- Java 17 ou superior
-- Maven
-
-Na pasta do projeto execute:  
-mvn clean install  
-mvn spring-boot:run
-
-A aplicação iniciará em:
-http://localhost:8080
 
 ---
 
